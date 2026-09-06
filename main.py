@@ -1,5 +1,3 @@
-import math
-
 import numpy as np
 from simulator import Simulator, centerline
 import WaypointUtility
@@ -7,8 +5,8 @@ from PurePursuitController import PurePursuitController
 from LongPController import LongPController
 
 sim = Simulator()
-WaypointManager = WaypointUtility.WaypointManager(waypoint_count=500, track_len=105)
 # this particular track repeats after s=105 along centerline
+WaypointManager = WaypointUtility.WaypointManager(waypoint_count=500, track_len=105)
 
 v_log = []
 
@@ -29,17 +27,15 @@ def controller(x):
     
     ... # YOUR CODE HERE
     v_log.append(v)
-    LateralController = PurePursuitController(kdd=2, min_lookahead=4.0, max_lookahead=6.5, wheelbase=1.58)
-    LongitudinalController = LongPController(1, 10, 6, 12)
+    LateralController = PurePursuitController(kdd=2, kp=10, min_lookahead=4.0, max_lookahead=6.5, wheelbase=1.58, steering_constraints=(-1.0, 1.0))
+    LongitudinalController = LongPController(kp=1, kc=5, min_speed=6, max_speed=12, throttle_constraints=(-8, 4))
     target_waypoint, idx = WaypointManager.search_for_centerline_goalpoint(xpos, ypos, LateralController.get_lookahead(v))
-    steer, kappa, turn_radius = LateralController.get_steering_output(v, target_waypoint, xpos, ypos, theta, phi)
-    steer_clipped = np.clip(steer, -1.0, 1.0)
 
-    throttle, target_speed = LongitudinalController.get_accel_output(kappa, v)
-    throttle_clipped = np.clip(throttle, -8, 4)
+    steer, kappa, turn_radius = LateralController.get_steering_input(v, target_waypoint, xpos, ypos, theta, phi)
+    throttle, target_speed = LongitudinalController.get_accel_input(kappa, v)
 
-    debug_array = [v, target_speed, kappa, throttle_clipped]
-    return np.array([throttle_clipped, steer_clipped]), target_waypoint, debug_array
+    debug_array = [v, target_speed, kappa, throttle]
+    return np.array([throttle, steer]), target_waypoint, debug_array
 
 sim.set_controller(controller)
 sim.run()

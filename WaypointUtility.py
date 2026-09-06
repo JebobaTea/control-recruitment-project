@@ -81,9 +81,9 @@ class WaypointManager:
                             self.last_centerline_idx = idx
                             break
                     else:
-                        # in case for some reason the robot cannot find intersection in the next path segment, but we also don't want it to go backward
+                        # can't find intersection in next segment, but don't look in this one
                         self.last_centerline_idx = idx + 1
-                # if no solutions are in range
+                # no solutions are in range
                 else:
                     goal_pt = path[self.last_centerline_idx]
         return goal_pt, self.last_centerline_idx

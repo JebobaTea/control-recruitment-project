@@ -2,16 +2,21 @@ import math
 import numpy as np
 
 class PurePursuitController:
-    def __init__(self, kdd=0.3, min_lookahead=2.0, max_lookahead=5.0, wheelbase=1.58):
+    def __init__(self, kdd=0.3, kp=10, min_lookahead=2.0, max_lookahead=5.0,
+                 wheelbase=1.58, steering_constraints: tuple[float, float]=(-1.0, 1.0),
+                 wheel_constraints: tuple[float, float]=(-0.7, 7)):
         self.kdd = kdd # look-ahead constant
+        self.kp = kp # steering gain
         self.min_lookahead = min_lookahead
         self.max_lookahead = max_lookahead
         self.wheelbase = wheelbase
+        self.steering_constraints = steering_constraints
+        self.wheel_constraints = wheel_constraints
 
     def get_lookahead(self, v_current):
         return np.clip(self.kdd * v_current, self.min_lookahead, self.max_lookahead)
 
-    def get_steering_output(self, v_current, target_waypoint, current_x, current_y, theta, phi):
+    def get_steering_input(self, v_current, target_waypoint, current_x, current_y, theta, phi):
         lookahead_dist = self.get_lookahead(v_current)
 
         target_x = target_waypoint[0]
@@ -35,4 +40,6 @@ class PurePursuitController:
         if steering_error < -math.pi: steering_error += math.pi
         elif steering_error > math.pi: steering_error -= math.pi
 
-        return steering_error * 10, kappa, turn_radius
+        steering_input = steering_error * self.kp
+
+        return np.clip(steering_input, self.steering_constraints[0], self.steering_constraints[1]), kappa, turn_radius
