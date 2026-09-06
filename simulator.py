@@ -163,8 +163,8 @@ class Simulator:
         axs[3].plot(ts, xs[3]); axs[3].set_ylabel('velocity (m/s)')
         axs[4].plot(ts, xs[4]); axs[4].set_ylabel('steering angle (rad)')
 
-        axs[5].plot(ts, us[0]); axs[5].set_ylabel('fwd accel (m/s^2)')
-        axs[6].plot(ts, us[1]); axs[6].set_ylabel('steering velocity (rad/s)')
+        axs[5].plot(ts, us[0]); axs[5].set_ylabel('fwd acc')
+        axs[6].plot(ts, us[1]); axs[6].set_ylabel('steer v')
         for i in range(5):
             axs[i].scatter(ts[crash], xs[i, crash], color='tab:red', marker='+')
             axs[i].scatter(ts[slip], xs[i, slip], color='tab:orange', marker='x')

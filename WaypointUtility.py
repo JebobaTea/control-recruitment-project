@@ -12,13 +12,14 @@ def pt_dist(pt1, pt2):
     return dist_euclid(pt1[0], pt1[1], pt2[0], pt2[1])
 
 class WaypointManager:
-    def __init__(self, waypoint_count:int=1000, track_len=419):
-        # this particular track repeats after s=419 along centerline
+    def __init__(self, waypoint_count:int=100, track_len=105):
         self.ds = track_len / waypoint_count
         self.centerline_pregenerated = np.array([centerline(s) for s in np.linspace(0, track_len, waypoint_count)])
-        self.last_centerline_idx = 5
+        self.last_centerline_idx = 0
 
     def search_for_centerline_goalpoint(self, current_x, current_y, lookahead_dist):
+        if self.last_centerline_idx > len(self.centerline_pregenerated):
+            self.last_centerline_idx = 0
         start_idx = self.last_centerline_idx
 
         path = self.centerline_pregenerated
@@ -39,7 +40,6 @@ class WaypointManager:
             dr = math.sqrt(dx ** 2 + dy ** 2)
             D = x1 * y2 - x2 * y1
             discriminant = (lookahead_dist ** 2) * (dr ** 2) - D ** 2
-
             if discriminant >= 0:
                 sol_x1 = (D * dy + sign(dy) * dx * np.sqrt(discriminant)) / dr ** 2
                 sol_x2 = (D * dy - sign(dy) * dx * np.sqrt(discriminant)) / dr ** 2
@@ -55,7 +55,6 @@ class WaypointManager:
                 min_y = min(path[idx][1], path[idx + 1][1])
                 max_x = max(path[idx][0], path[idx + 1][0])
                 max_y = max(path[idx][1], path[idx + 1][1])
-
                 # if one or both of the solutions are in range
                 if ((min_x <= sol_pt1[0] <= max_x) and (min_y <= sol_pt1[1] <= max_y)) or (
                         (min_x <= sol_pt2[0] <= max_x) and (min_y <= sol_pt2[1] <= max_y)):
@@ -78,7 +77,6 @@ class WaypointManager:
                     if pt_dist(goal_pt, path[idx + 1]) < pt_dist([current_x, current_y], path[idx + 1]):
                         # update self.last_centerline_idx and exit
                         self.last_centerline_idx = idx
-                        print("loop exit succcess")
                         break
                     else:
                         # in case for some reason the robot cannot find intersection in the next path segment, but we also don't want it to go backward
@@ -86,7 +84,6 @@ class WaypointManager:
                 # if no solutions are in range
                 else:
                     goal_pt = path[self.last_centerline_idx]
-        print(self.last_centerline_idx)
         return goal_pt, self.last_centerline_idx
 
     def generate_raceline(self):

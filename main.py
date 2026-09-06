@@ -7,7 +7,8 @@ from PurePursuitController import PurePursuitController
 from LongPController import LongPController
 
 sim = Simulator()
-WaypointManager = WaypointUtility.WaypointManager(waypoint_count=1000, track_len=419)
+WaypointManager = WaypointUtility.WaypointManager(waypoint_count=500, track_len=105)
+# this particular track repeats after s=105 along centerline
 
 tpt_log = []
 
@@ -28,7 +29,7 @@ def controller(x):
     
     ... # YOUR CODE HERE
     LateralController = PurePursuitController(kdd=1, min_lookahead=3.0, max_lookahead=6.0, wheelbase=1.58)
-    LongitudinalController = LongPController(2, 2, 10)
+    LongitudinalController = LongPController(2.5, 3, 12)
     target_waypoint, idx = WaypointManager.search_for_centerline_goalpoint(xpos, ypos, LateralController.get_lookahead(v))
     steer, target = LateralController.get_steering_output(v, target_waypoint, xpos, ypos, theta, phi)
     steer = np.clip(steer, -1.0, 1.0)
@@ -40,8 +41,10 @@ def controller(x):
     debug_array = [x * 180 / math.pi for x in debug_array]
     debug_array.append(idx)
     return np.array([throttle, steer]), target_waypoint, debug_array
-
 sim.set_controller(controller)
 sim.run()
-sim.animate()
+#sim.animate()
 sim.plot()
+results = sim.get_results()
+print(np.count_nonzero(np.array(results[3])))
+print(np.count_nonzero(np.array(results[4])))
