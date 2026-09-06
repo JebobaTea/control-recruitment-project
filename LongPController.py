@@ -9,9 +9,9 @@ class LongPController:
         self.max_speed = max_speed
 
     def get_accel_output(self, kappa, current_speed):
-        target_speed = self.max_speed * (1 / (kappa * self.kc))
+        target_speed = self.max_speed * (1 / (1 + abs(kappa) * self.kc))
         if current_speed < self.min_speed:
             target_speed = self.max_speed
         d_speed = target_speed - current_speed
 
-        return self.kp * d_speed
+        return self.kp * d_speed, target_speed
