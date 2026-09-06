@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation, patches, transforms
 
+np.set_printoptions(formatter={'float': '{:0.2f}'.format})
+
 _centerline = ca.external(
     'centerline', 
     ca.Importer(
@@ -108,7 +110,7 @@ class Simulator:
         self.log = []
         state = np.zeros(5)
         for t in np.arange(0, tf, 0.01):
-            u, tlog = self.cb(state)
+            u, tlog, steer = self.cb(state)
             assert isinstance(u, np.ndarray), f"expected numpy array from controller but got type {type(u)}"
             assert u.shape==(2,), f"expected shape (2,) from controller but received {u.shape}"
             u = np.array([
@@ -116,13 +118,14 @@ class Simulator:
                 np.clip(u[1], *self._steering_vel_limits)
             ])
             tlog = np.array([tlog])
+            steer = np.array([steer])
 
             if ((state[4] > self._steering_limits[1] and u[1] > 0)
              or (state[4] < self._steering_limits[0] and u[1] < 0)):
                 u[1] = 0
             crash = self._check_collision(state)
             slip = self._check_accel(state, u)
-            self.log.append((t, state, u, crash, slip, tlog))
+            self.log.append((t, state, u, crash, slip, tlog, steer))
             state = self.dynamics(state, u).toarray().flatten()
     def get_results(self):
         """get the simulation results. gives a tuple of arrays: (timestamps, states, controls, crash, slip). 
@@ -143,14 +146,15 @@ class Simulator:
         crash  = np.array([i[3] for i in self.log])
         slip  = np.array([i[4] for i in self.log])
         targets = np.array([i[5] for i in self.log])
-        return (ts, xs, us, crash, slip, targets)
+        steer = np.array([i[6] for i in self.log])
+        return (ts, xs, us, crash, slip, targets, steer)
     def plot(self, block=True):
         """plot the last run of the simulator.
 
         Args:
             block (bool, optional): the `block` argument to plt.show(). Defaults to True.
         """
-        ts, xs, us, crash, slip, targets = self.get_results()
+        ts, xs, us, crash, slip, targets, steer = self.get_results()
         fig, axs = plt.subplots(7, sharex=True)
 
         axs[0].plot(ts, xs[0]); axs[0].set_ylabel('x pos (m)')
@@ -191,7 +195,7 @@ class Simulator:
         axs[1].set_title('net acceleration')
         axs[1].set_xlabel('time (s)')
         axs[1].set_ylabel('acceleration (m/s^2)')
-        ts, xs, us, crash, slip, targets = self.get_results()
+        ts, xs, us, crash, slip, targets, steer = self.get_results()
         accel_values = np.array([self._get_accel(x, u) for x, u in zip(xs.T, us.T)])
         axs[1].hlines([12], [0], [np.max(ts)], linestyles='dashed', color='tab:red')
         collision_patches = []
@@ -213,8 +217,7 @@ class Simulator:
             posearrow.set_data(**arrow_data)
             accel.set_xdata(ts[:i+1])
             accel.set_ydata(accel_values[:i+1])
-            #targetpt.set_xdata([targets[i][0][1]])
-            #targetpt.set_ydata([targets[i][0][1]])
+            print(steer[i])
             targetpt.set_offsets([[targets[i][0][0], targets[i][0][1]]])
             return [accel, outline, posearrow, targetpt] + collision_patches
 

@@ -16,7 +16,7 @@ class WaypointManager:
         # this particular track repeats after s=419 along centerline
         self.ds = track_len / waypoint_count
         self.centerline_pregenerated = np.array([centerline(s) for s in np.linspace(0, track_len, waypoint_count)])
-        self.last_centerline_idx = 0
+        self.last_centerline_idx = 5
 
     def search_for_centerline_goalpoint(self, current_x, current_y, lookahead_dist):
         start_idx = self.last_centerline_idx
@@ -25,12 +25,15 @@ class WaypointManager:
         goal_pt = path[self.last_centerline_idx]
 
         # line-circle intersection, checking each line segment along waypoint list, one at a time
-        for i in range(start_idx, len(path) - 1):
+        for i in range(start_idx, len(path) + 10):
+            idx = i
+            if idx >= len(path) - 1:
+                idx = i % (len(path) - 1)
             # assumes circle is centered on 0, 0, so correct for offset
-            x1 = path[i][0] - current_x
-            y1 = path[i][1] - current_y
-            x2 = path[i + 1][0] - current_x
-            y2 = path[i + 1][1] - current_y
+            x1 = path[idx][0] - current_x
+            y1 = path[idx][1] - current_y
+            x2 = path[idx + 1][0] - current_x
+            y2 = path[idx + 1][1] - current_y
             dx = x2 - x1
             dy = y2 - y1
             dr = math.sqrt(dx ** 2 + dy ** 2)
@@ -48,39 +51,43 @@ class WaypointManager:
                 sol_pt2 = [sol_x2 + current_x, sol_y2 + current_y]
 
                 # discriminant check only considers infinite line, must restrict to segment
-                min_x = min(path[i][0], path[i + 1][0])
-                min_y = min(path[i][1], path[i + 1][1])
-                max_x = max(path[i][0], path[i + 1][0])
-                max_y = max(path[i][1], path[i + 1][1])
+                min_x = min(path[idx][0], path[idx + 1][0])
+                min_y = min(path[idx][1], path[idx + 1][1])
+                max_x = max(path[idx][0], path[idx + 1][0])
+                max_y = max(path[idx][1], path[idx + 1][1])
 
-                # first solution in range
-                if (min_x <= sol_pt1[0] <= max_x) and (min_y <= sol_pt1[1] <= max_y):
-                    if (min_x <= sol_pt2[0] <= max_x) and (min_y <= sol_pt2[1] <= max_y):
-                        # second solution also in range
-                        # make the decision by comparing the distance between the intersections and the next point in path
-                        # (which intersection closer to second point in path)
-                        if pt_dist(sol_pt1, path[i + 1]) < pt_dist(sol_pt2, path[i + 1]):
+                # if one or both of the solutions are in range
+                if ((min_x <= sol_pt1[0] <= max_x) and (min_y <= sol_pt1[1] <= max_y)) or (
+                        (min_x <= sol_pt2[0] <= max_x) and (min_y <= sol_pt2[1] <= max_y)):
+
+                    # if both solutions are in range, check which one is better
+                    if ((min_x <= sol_pt1[0] <= max_x) and (min_y <= sol_pt1[1] <= max_y)) and (
+                            (min_x <= sol_pt2[0] <= max_x) and (min_y <= sol_pt2[1] <= max_y)):
+                        # find the point further down
+                        if pt_dist(sol_pt1, path[idx + 1]) < pt_dist(sol_pt2, path[idx + 1]):
                             goal_pt = sol_pt1
                         else:
                             goal_pt = sol_pt2
+                    # if not both solutions are in range, take the one that's in range
                     else:
-                        # only 1st sol in range
-                        goal_pt = sol_pt1
-                elif (min_x <= sol_pt2[0] <= max_x) and (min_y <= sol_pt2[1] <= max_y):
-                    # only second solution in range
-                    goal_pt = sol_pt2
+                        if (min_x <= sol_pt1[0] <= max_x) and (min_y <= sol_pt1[1] <= max_y):
+                            goal_pt = sol_pt1
+                        else:
+                            goal_pt = sol_pt2
+                    # only exit loop if the solution pt found is closer to the next pt in path than the current pos
+                    if pt_dist(goal_pt, path[idx + 1]) < pt_dist([current_x, current_y], path[idx + 1]):
+                        # update self.last_centerline_idx and exit
+                        self.last_centerline_idx = idx
+                        print("loop exit succcess")
+                        break
+                    else:
+                        # in case for some reason the robot cannot find intersection in the next path segment, but we also don't want it to go backward
+                        self.last_centerline_idx = idx + 1
+                # if no solutions are in range
                 else:
-                    # no solutions in range
                     goal_pt = path[self.last_centerline_idx]
-
-                # break if goal point is further along the path
-                if pt_dist(goal_pt, path[i + 1]) < pt_dist([current_x, current_y], path[i + 1]):
-                    self.last_centerline_idx = i
-                    break
-                else:
-                    # can't find intersection in next segment
-                    self.last_centerline_idx = i + 1
-        return goal_pt
+        print(self.last_centerline_idx)
+        return goal_pt, self.last_centerline_idx
 
     def generate_raceline(self):
         pass

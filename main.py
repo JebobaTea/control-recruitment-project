@@ -1,7 +1,10 @@
+import math
+
 import numpy as np
 from simulator import Simulator, centerline
 import WaypointUtility
 from PurePursuitController import PurePursuitController
+from LongPController import LongPController
 
 sim = Simulator()
 WaypointManager = WaypointUtility.WaypointManager(waypoint_count=1000, track_len=419)
@@ -24,20 +27,19 @@ def controller(x):
     theta   = x[4]                  # current steering angle
     
     ... # YOUR CODE HERE
-    LateralController = PurePursuitController(kdd=0.3, min_lookahead=2.0, max_lookahead=50.0, wheelbase=1.58)
-    target_waypoint = WaypointManager.search_for_centerline_goalpoint(xpos, ypos, LateralController.get_lookahead(v))
-    steer = LateralController.get_steering_output(v, target_waypoint)
+    LateralController = PurePursuitController(kdd=1, min_lookahead=3.0, max_lookahead=6.0, wheelbase=1.58)
+    LongitudinalController = LongPController(2, 2, 10)
+    target_waypoint, idx = WaypointManager.search_for_centerline_goalpoint(xpos, ypos, LateralController.get_lookahead(v))
+    steer, target = LateralController.get_steering_output(v, target_waypoint, xpos, ypos, theta, phi)
+    steer = np.clip(steer, -1.0, 1.0)
 
-    print(f"{xpos:2f}", f"{ypos:2f}")
-    print(target_waypoint)
-    print(theta)
-    print()
-    if v > 50:
-        a = 0
-    else:
-        a = 5
+    throttle = LongitudinalController.get_accel_output(steer, v)
+    throttle = np.clip(throttle, -10, 4)
 
-    return np.array([a, steer]), target_waypoint
+    debug_array = [steer, target, theta, phi]
+    debug_array = [x * 180 / math.pi for x in debug_array]
+    debug_array.append(idx)
+    return np.array([throttle, steer]), target_waypoint, debug_array
 
 sim.set_controller(controller)
 sim.run()
