@@ -76,8 +76,10 @@ class WaypointManager:
                     # only exit loop if the solution pt found is closer to the next pt in path than the current pos
                     if pt_dist(goal_pt, path[idx + 1]) < pt_dist([current_x, current_y], path[idx + 1]):
                         # update self.last_centerline_idx and exit
-                        self.last_centerline_idx = idx
-                        break
+                        # sanity check: don't loop around early
+                        if (idx - self.last_centerline_idx) < len(self.centerline_pregenerated) / 2:
+                            self.last_centerline_idx = idx
+                            break
                     else:
                         # in case for some reason the robot cannot find intersection in the next path segment, but we also don't want it to go backward
                         self.last_centerline_idx = idx + 1

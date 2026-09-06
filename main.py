@@ -28,22 +28,21 @@ def controller(x):
     theta   = x[4]                  # current steering angle
     
     ... # YOUR CODE HERE
-    LateralController = PurePursuitController(kdd=1, min_lookahead=3.0, max_lookahead=6.0, wheelbase=1.58)
-    LongitudinalController = LongPController(2.5, 3, 12)
+    LateralController = PurePursuitController(kdd=2, min_lookahead=4.0, max_lookahead=6.0, wheelbase=1.58)
+    LongitudinalController = LongPController(2.5, 1, 6, 20)
     target_waypoint, idx = WaypointManager.search_for_centerline_goalpoint(xpos, ypos, LateralController.get_lookahead(v))
-    steer, target = LateralController.get_steering_output(v, target_waypoint, xpos, ypos, theta, phi)
-    steer = np.clip(steer, -1.0, 1.0)
+    steer, kappa, turn_radius = LateralController.get_steering_output(v, target_waypoint, xpos, ypos, theta, phi)
+    steer_clipped = np.clip(steer, -1.0, 1.0)
 
-    throttle = LongitudinalController.get_accel_output(steer, v)
-    throttle = np.clip(throttle, -10, 4)
+    throttle = LongitudinalController.get_accel_output(kappa, v)
+    throttle_clipped = np.clip(throttle, -6, 4)
 
-    debug_array = [steer, target, theta, phi]
-    debug_array = [x * 180 / math.pi for x in debug_array]
-    debug_array.append(idx)
-    return np.array([throttle, steer]), target_waypoint, debug_array
+    debug_array = [v, throttle, kappa, turn_radius]
+    return np.array([throttle_clipped, steer_clipped]), target_waypoint, debug_array
+
 sim.set_controller(controller)
 sim.run()
-#sim.animate()
+sim.animate()
 sim.plot()
 results = sim.get_results()
 print(np.count_nonzero(np.array(results[3])))

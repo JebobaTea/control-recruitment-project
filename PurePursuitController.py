@@ -25,6 +25,8 @@ class PurePursuitController:
         relative_target_y = np.sin(-phi) * compensated_target_x + np.cos(-phi) * compensated_target_y
 
         alpha = np.arctan2(relative_target_y, relative_target_x)
+        turn_radius = lookahead_dist / (2 * np.sin(alpha))
+        kappa = 1 / turn_radius
         target_steer = np.arctan((2 * self.wheelbase * np.sin(alpha)) / lookahead_dist)
 
         # current steering angle vs desired steering angle at this very instant
@@ -33,4 +35,4 @@ class PurePursuitController:
         if steering_error < -math.pi: steering_error += math.pi
         elif steering_error > math.pi: steering_error -= math.pi
 
-        return steering_error * 10, target_steer
+        return steering_error * 10, kappa, turn_radius
