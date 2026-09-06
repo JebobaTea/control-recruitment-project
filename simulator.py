@@ -108,20 +108,21 @@ class Simulator:
         self.log = []
         state = np.zeros(5)
         for t in np.arange(0, tf, 0.01):
-            u = self.cb(state)
+            u, tlog = self.cb(state)
             assert isinstance(u, np.ndarray), f"expected numpy array from controller but got type {type(u)}"
             assert u.shape==(2,), f"expected shape (2,) from controller but received {u.shape}"
             u = np.array([
                 np.clip(u[0], *self._accel_limits),
                 np.clip(u[1], *self._steering_vel_limits)
             ])
+            tlog = np.array([tlog])
 
             if ((state[4] > self._steering_limits[1] and u[1] > 0)
              or (state[4] < self._steering_limits[0] and u[1] < 0)):
                 u[1] = 0
             crash = self._check_collision(state)
             slip = self._check_accel(state, u)
-            self.log.append((t, state, u, crash, slip))
+            self.log.append((t, state, u, crash, slip, tlog))
             state = self.dynamics(state, u).toarray().flatten()
     def get_results(self):
         """get the simulation results. gives a tuple of arrays: (timestamps, states, controls, crash, slip). 
@@ -132,7 +133,7 @@ class Simulator:
             ValueError: if the sim has not been run, there will be no results.
 
         Returns:
-            (array, array, array, array, array): shapes (N,), (5, N), (2, N), (N,), (N,). time series data as described above.
+            (array, array, array, array, array, array): shapes (N,), (5, N), (2, N), (N,), (N,), (N,). time series data as described above.
         """
         try: log = self.log
         except: raise ValueError("cannot animate; no results exist. Did you .run() the simulator?")
@@ -141,14 +142,15 @@ class Simulator:
         us = np.concatenate([i[2][:, np.newaxis] for i in self.log], axis=1)
         crash  = np.array([i[3] for i in self.log])
         slip  = np.array([i[4] for i in self.log])
-        return (ts, xs, us, crash, slip)
+        targets = np.array([i[5] for i in self.log])
+        return (ts, xs, us, crash, slip, targets)
     def plot(self, block=True):
         """plot the last run of the simulator.
 
         Args:
             block (bool, optional): the `block` argument to plt.show(). Defaults to True.
         """
-        ts, xs, us, crash, slip = self.get_results()
+        ts, xs, us, crash, slip, targets = self.get_results()
         fig, axs = plt.subplots(7, sharex=True)
 
         axs[0].plot(ts, xs[0]); axs[0].set_ylabel('x pos (m)')
@@ -182,17 +184,18 @@ class Simulator:
         axs[0].scatter(*self.right_cones.T, color='tab:orange')
         outline = axs[0].add_patch(patches.Polygon(self.car_outline, fill=True, closed=True, facecolor='lightblue', edgecolor='black'))
         posearrow = axs[0].add_patch(patches.FancyArrow(0, 0, 1, 0, width=0.1, color='tab:red'))
+
         accel = axs[1].plot([0],[0])[0]
         axs[0].set_title('car pose')
 
         axs[1].set_title('net acceleration')
         axs[1].set_xlabel('time (s)')
         axs[1].set_ylabel('acceleration (m/s^2)')
-
-        ts, xs, us, crash, slip = self.get_results()
+        ts, xs, us, crash, slip, targets = self.get_results()
         accel_values = np.array([self._get_accel(x, u) for x, u in zip(xs.T, us.T)])
         axs[1].hlines([12], [0], [np.max(ts)], linestyles='dashed', color='tab:red')
         collision_patches = []
+        targetpt = axs[0].scatter([0], [0], color='tab:red')
         def frame(i):
             outline_points = ((self.R(xs[2, i])@self.car_outline.T).T + xs[0:2, i])
             arrow_data = dict(
@@ -210,7 +213,10 @@ class Simulator:
             posearrow.set_data(**arrow_data)
             accel.set_xdata(ts[:i+1])
             accel.set_ydata(accel_values[:i+1])
-            return [accel, outline, posearrow] + collision_patches
+            #targetpt.set_xdata([targets[i][0][1]])
+            #targetpt.set_ydata([targets[i][0][1]])
+            targetpt.set_offsets([[targets[i][0][0], targets[i][0][1]]])
+            return [accel, outline, posearrow, targetpt] + collision_patches
 
         anim = animation.FuncAnimation(fig, frame, len(ts), interval=10)
         if save:
