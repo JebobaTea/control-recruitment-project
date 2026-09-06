@@ -29,6 +29,7 @@ class PurePursuitController:
         relative_target_x = np.cos(-phi) * compensated_target_x - np.sin(-phi) * compensated_target_y
         relative_target_y = np.sin(-phi) * compensated_target_x + np.cos(-phi) * compensated_target_y
 
+        # https://thomasfermi.github.io/Algorithms-for-Automated-Driving/Control/PurePursuit.html
         alpha = np.arctan2(relative_target_y, relative_target_x)
         turn_radius = lookahead_dist / (2 * np.sin(alpha))
         kappa = 1 / turn_radius

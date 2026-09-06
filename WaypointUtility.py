@@ -1,5 +1,6 @@
 import numpy as np
 import math
+import cvxpy as cp
 from simulator import centerline
 
 def sign(x):
@@ -14,19 +15,23 @@ def pt_dist(pt1, pt2):
 class WaypointManager:
     def __init__(self, waypoint_count:int=100, track_len=105):
         self.ds = track_len / waypoint_count
-        self.centerline_pregenerated = np.array([centerline(s) for s in np.linspace(0, track_len, waypoint_count)])
+        self.waypoint_count = waypoint_count
+        self.centerline_discrete = np.array([centerline(s) for s in np.linspace(0, track_len, waypoint_count)])
         self.last_centerline_idx = 0
+        self.normals = None
 
     def search_for_centerline_goalpoint(self, current_x, current_y, lookahead_dist):
-        if self.last_centerline_idx > len(self.centerline_pregenerated):
+        # referenced from
+        # https://wiki.purduesigbots.com/software/control-algorithms/basic-pure-pursuit
+        if self.last_centerline_idx > len(self.centerline_discrete):
             self.last_centerline_idx = 0
         start_idx = self.last_centerline_idx
 
-        path = self.centerline_pregenerated
+        path = self.centerline_discrete
         goal_pt = path[self.last_centerline_idx]
 
         # line-circle intersection, checking each line segment along waypoint list, one at a time
-        for i in range(start_idx, len(path) + 10):
+        for i in range(start_idx, self.waypoint_count + 10):
             idx = i
             if idx >= len(path) - 1:
                 idx = i % (len(path) - 1)
@@ -77,7 +82,7 @@ class WaypointManager:
                     if pt_dist(goal_pt, path[idx + 1]) < pt_dist([current_x, current_y], path[idx + 1]):
                         # update self.last_centerline_idx and exit
                         # sanity check: don't loop around early
-                        if (idx - self.last_centerline_idx) < len(self.centerline_pregenerated) / 2:
+                        if (idx - self.last_centerline_idx) < len(self.centerline_discrete) / 2:
                             self.last_centerline_idx = idx
                             break
                     else:
@@ -88,5 +93,48 @@ class WaypointManager:
                     goal_pt = path[self.last_centerline_idx]
         return goal_pt, self.last_centerline_idx
 
-    def generate_raceline(self):
-        pass
+    def generate_raceline(self, search_width: tuple[float, float]=(-0.2, 0.2)):
+        normals_temp = []
+        for i in range(self.waypoint_count):
+            idx_next = (i + 1) % self.waypoint_count
+            idx_prev = (i - 1) % self.waypoint_count
+            pt_next = self.centerline_discrete[idx_next]
+            pt_prev = self.centerline_discrete[idx_prev]
+
+            dy = pt_next[1] - pt_prev[1]
+            dx = pt_next[0] - pt_prev[0]
+
+            # https://stackoverflow.com/questions/1243614/how-do-i-calculate-the-normal-vector-of-a-line-segment
+            normal = np.array([-dy, dx])
+            normal /= np.linalg.norm(normal)
+            normals_temp.append(normal)
+
+        self.normals = np.array(normals_temp)
+
+        # displacement factor
+        alpha = cp.Variable(self.waypoint_count)
+
+        x_shifted = self.centerline_discrete[:, 0] + cp.multiply(alpha, self.normals[:, 0])
+        y_shifted = self.centerline_discrete[:, 1] + cp.multiply(alpha, self.normals[:, 1])
+
+        cost = 0
+        # need to work within cvxpy operations
+        for i in range(self.waypoint_count):
+            idx_next = (i + 1) % self.waypoint_count
+            idx_prev = (i - 1) % self.waypoint_count
+
+            # cannot use kappa for minimum curvature QP optimization because breaks DCP
+            # (cannot divide by optimization variable)
+            d2x = x_shifted[idx_next] - 2 * x_shifted[i] + x_shifted[idx_prev]
+            d2y = y_shifted[idx_next] - 2 * y_shifted[i] + y_shifted[idx_prev]
+            cost = cost + cp.square(d2x) + cp.square(d2y)
+
+        constraints = [alpha >= search_width[0], alpha <= search_width[1]]
+        prob = cp.Problem(cp.Minimize(cost), constraints)
+        prob.solve(solver=cp.OSQP, verbose=False)
+
+        new_alpha = alpha.value
+        print(alpha.value)
+        optimal_x = self.centerline_discrete[:, 0] + new_alpha * self.normals[:, 0]
+        optimal_y = self.centerline_discrete[:, 1] + new_alpha * self.normals[:, 1]
+        self.centerline_discrete = np.vstack((optimal_x, optimal_y)).T

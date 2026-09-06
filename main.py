@@ -6,9 +6,11 @@ from LongPController import LongPController
 
 sim = Simulator()
 # this particular track repeats after s=105 along centerline
-WaypointManager = WaypointUtility.WaypointManager(waypoint_count=500, track_len=105)
+WaypointManager = WaypointUtility.WaypointManager(waypoint_count=200, track_len=105)
+WaypointManager.generate_raceline(search_width=(-2, 2))
 
 v_log = []
+kappa_log = []
 
 def controller(x):
     """controller for a car
@@ -26,7 +28,6 @@ def controller(x):
     theta   = x[4]                  # current steering angle
     
     ... # YOUR CODE HERE
-    v_log.append(v)
     LateralController = PurePursuitController(kdd=2, kp=10, min_lookahead=4.0, max_lookahead=6.5, wheelbase=1.58, steering_constraints=(-1.0, 1.0))
     LongitudinalController = LongPController(kp=1, kc=5, min_speed=6, max_speed=12, throttle_constraints=(-8, 4))
     target_waypoint, idx = WaypointManager.search_for_centerline_goalpoint(xpos, ypos, LateralController.get_lookahead(v))
@@ -35,6 +36,9 @@ def controller(x):
     throttle, target_speed = LongitudinalController.get_accel_input(kappa, v)
 
     debug_array = [v, target_speed, kappa, throttle]
+
+    v_log.append(v)
+    kappa_log.append(abs(kappa))
     return np.array([throttle, steer]), target_waypoint, debug_array
 
 sim.set_controller(controller)
@@ -45,3 +49,4 @@ results = sim.get_results()
 print(np.count_nonzero(np.array(results[3])))
 print(np.count_nonzero(np.array(results[4])))
 print(np.mean(np.array(v_log)))
+print(np.mean(np.array(kappa_log)))
