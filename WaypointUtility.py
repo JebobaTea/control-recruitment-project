@@ -12,23 +12,39 @@ def dist_euclid(x1, y1, x2, y2):
 def pt_dist(pt1, pt2):
     return dist_euclid(pt1[0], pt1[1], pt2[0], pt2[1])
 
+def menger(pt1, pt2, pt3):
+    s1 = pt_dist(pt1, pt2)
+    s2 = pt_dist(pt2, pt3)
+    s3 = pt_dist(pt1, pt3)
+    sp = (s1 + s2 + s3) / 2
+    a = math.sqrt(sp * (sp - s1) * (sp - s2) * (sp - s3))
+    kappa = (4 * a) / (s1 * s2 * s3)
+    if kappa == 0:
+        r = 1000000
+    else:
+        r = 1 / kappa
+    return kappa, r
+
 class WaypointManager:
-    def __init__(self, waypoint_count:int=100, track_len=105):
+    def __init__(self, waypoint_count:int=100, track_len=104):
         self.ds = track_len / waypoint_count
         self.waypoint_count = waypoint_count
         self.centerline_discrete = np.array([centerline(s) for s in np.linspace(0, track_len, waypoint_count)])
-        self.last_centerline_idx = 0
+        self.last_idx = 0
+        self.raceline = None
         self.normals = None
 
-    def search_for_centerline_goalpoint(self, current_x, current_y, lookahead_dist):
+    def search_for_goalpoint(self, current_x: float, current_y: float, lookahead_dist: float, use_raceline=True):
         # referenced from
         # https://wiki.purduesigbots.com/software/control-algorithms/basic-pure-pursuit
-        if self.last_centerline_idx > len(self.centerline_discrete):
-            self.last_centerline_idx = 0
-        start_idx = self.last_centerline_idx
-
         path = self.centerline_discrete
-        goal_pt = path[self.last_centerline_idx]
+        if use_raceline and self.raceline is not None:
+            path = self.raceline
+
+        if self.last_idx > len(self.centerline_discrete):
+            self.last_idx = 0
+        start_idx = self.last_idx
+        goal_pt = path[self.last_idx]
 
         # line-circle intersection, checking each line segment along waypoint list, one at a time
         for i in range(start_idx, self.waypoint_count + 10):
@@ -80,18 +96,18 @@ class WaypointManager:
                             goal_pt = sol_pt2
                     # only exit loop if the solution pt found is closer to the next pt in path than the current pos
                     if pt_dist(goal_pt, path[idx + 1]) < pt_dist([current_x, current_y], path[idx + 1]):
-                        # update self.last_centerline_idx and exit
+                        # update self.last_idx and exit
                         # sanity check: don't loop around early
-                        if (idx - self.last_centerline_idx) < len(self.centerline_discrete) / 2:
-                            self.last_centerline_idx = idx
+                        if (idx - self.last_idx) < len(self.centerline_discrete) / 2:
+                            self.last_idx = idx
                             break
                     else:
                         # can't find intersection in next segment, but don't look in this one
-                        self.last_centerline_idx = idx + 1
+                        self.last_idx = idx + 1
                 # no solutions are in range
                 else:
-                    goal_pt = path[self.last_centerline_idx]
-        return goal_pt, self.last_centerline_idx
+                    goal_pt = path[self.last_idx]
+        return goal_pt, self.last_idx
 
     def generate_raceline(self, search_width: tuple[float, float]=(-0.2, 0.2)):
         normals_temp = []
@@ -136,4 +152,33 @@ class WaypointManager:
         new_alpha = alpha.value
         optimal_x = self.centerline_discrete[:, 0] + new_alpha * self.normals[:, 0]
         optimal_y = self.centerline_discrete[:, 1] + new_alpha * self.normals[:, 1]
-        self.centerline_discrete = np.vstack((optimal_x, optimal_y)).T
+        self.raceline = np.vstack((optimal_x, optimal_y)).T
+
+    def get_optimal_states(self, current_x: float, current_y: float, lookahead_dist: float, window: int, use_raceline:bool=True, max_a_centr: float=5.0):
+        starting_waypoint, starting_idx = self.search_for_goalpoint(current_x, current_y, lookahead_dist, use_raceline)
+        path = self.raceline if (use_raceline and self.raceline is not None) else self.centerline_discrete
+        idx_curr = starting_idx
+        states = []
+        for i in range(window):
+            idx_next = (idx_curr + i) % len(path)
+            idx_prev = starting_idx - 1
+            if idx_prev < 0:
+                idx_prev = len(path) - 1
+
+            prev_pt = path[idx_prev]
+            curr_pt = path[idx_curr]
+            next_pt = path[idx_next]
+            kappa, radius = menger(prev_pt, curr_pt, next_pt)
+            tangent = next_pt - curr_pt
+
+            optimal_position = curr_pt
+            optimal_velocity = self.get_maximum_turn_velocity(radius, max_a_centr)
+            optimal_heading = np.arctan2(tangent[1], tangent[0])
+
+            states.append([optimal_position[0], optimal_position[1], optimal_heading, optimal_velocity])
+
+            idx_curr = idx_next
+        return np.array(states)
+
+    def get_maximum_turn_velocity(self, r, accel_cap):
+        return math.sqrt(accel_cap * r)
