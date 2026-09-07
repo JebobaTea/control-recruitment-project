@@ -36,6 +36,8 @@ class Simulator:
         self.dynamics = ca.external('F', ca.Importer('assets/system_dynamics.c', 'shell'))
         self.left_cones = np.load('assets/left.npy')
         self.right_cones = np.load('assets/right.npy')
+        self.wpt_base = np.load('wpt_base.npy')
+        self.wpt_opt = np.load('wpt_opt.npy')
         self._cones = np.concatenate([self.left_cones, self.right_cones], axis=0)
         self.car_outline = np.load('assets/pts_mat.npy')
         self.A = np.load('assets/a_mat.npy')
@@ -110,7 +112,7 @@ class Simulator:
         self.log = []
         state = np.zeros(5)
         for t in np.arange(0, tf, 0.01):
-            u, tlog, steer = self.cb(state)
+            u, tlog, debug = self.cb(state)
             assert isinstance(u, np.ndarray), f"expected numpy array from controller but got type {type(u)}"
             assert u.shape==(2,), f"expected shape (2,) from controller but received {u.shape}"
             u = np.array([
@@ -118,14 +120,14 @@ class Simulator:
                 np.clip(u[1], *self._steering_vel_limits)
             ])
             tlog = np.array([tlog])
-            steer = np.array([steer])
+            debug = np.array([debug])
 
             if ((state[4] > self._steering_limits[1] and u[1] > 0)
              or (state[4] < self._steering_limits[0] and u[1] < 0)):
                 u[1] = 0
             crash = self._check_collision(state)
             slip = self._check_accel(state, u)
-            self.log.append((t, state, u, crash, slip, tlog, steer))
+            self.log.append((t, state, u, crash, slip, tlog, debug))
             state = self.dynamics(state, u).toarray().flatten()
     def get_results(self):
         """get the simulation results. gives a tuple of arrays: (timestamps, states, controls, crash, slip). 
@@ -146,15 +148,15 @@ class Simulator:
         crash  = np.array([i[3] for i in self.log])
         slip  = np.array([i[4] for i in self.log])
         targets = np.array([i[5] for i in self.log])
-        steer = np.array([i[6] for i in self.log])
-        return (ts, xs, us, crash, slip, targets, steer)
+        debug = np.array([i[6] for i in self.log])
+        return (ts, xs, us, crash, slip, targets, debug)
     def plot(self, block=True):
         """plot the last run of the simulator.
 
         Args:
             block (bool, optional): the `block` argument to plt.show(). Defaults to True.
         """
-        ts, xs, us, crash, slip, targets, steer = self.get_results()
+        ts, xs, us, crash, slip, targets, debug = self.get_results()
         fig, axs = plt.subplots(7, sharex=True)
 
         axs[0].plot(ts, xs[0]); axs[0].set_ylabel('x pos (m)')
@@ -185,6 +187,8 @@ class Simulator:
         axs[0].set_aspect('equal')
         axs[1].set_aspect(1)
         axs[0].scatter(*self.left_cones.T, color='tab:blue')
+        axs[0].scatter(*self.wpt_base.T, color='tab:red', s=2)
+        axs[0].scatter(*self.wpt_opt.T, color='tab:green', s=2)
         axs[0].scatter(*self.right_cones.T, color='tab:orange')
         outline = axs[0].add_patch(patches.Polygon(self.car_outline, fill=True, closed=True, facecolor='lightblue', edgecolor='black'))
         posearrow = axs[0].add_patch(patches.FancyArrow(0, 0, 1, 0, width=0.1, color='tab:red'))
@@ -195,11 +199,11 @@ class Simulator:
         axs[1].set_title('net acceleration')
         axs[1].set_xlabel('time (s)')
         axs[1].set_ylabel('acceleration (m/s^2)')
-        ts, xs, us, crash, slip, targets, steer = self.get_results()
+        ts, xs, us, crash, slip, targets, debug = self.get_results()
         accel_values = np.array([self._get_accel(x, u) for x, u in zip(xs.T, us.T)])
         axs[1].hlines([12], [0], [np.max(ts)], linestyles='dashed', color='tab:red')
         collision_patches = []
-        targetpt = axs[0].scatter([0], [0], color='tab:red')
+        targetpt = axs[0].scatter([0], [0], color='tab:pink')
         def frame(i):
             outline_points = ((self.R(xs[2, i])@self.car_outline.T).T + xs[0:2, i])
             arrow_data = dict(
@@ -217,7 +221,7 @@ class Simulator:
             posearrow.set_data(**arrow_data)
             accel.set_xdata(ts[:i+1])
             accel.set_ydata(accel_values[:i+1])
-            print(steer[i])
+            print(debug[i])
             targetpt.set_offsets([[targets[i][0][0], targets[i][0][1]]])
             return [accel, outline, posearrow, targetpt] + collision_patches
 

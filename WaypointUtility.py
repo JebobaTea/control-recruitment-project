@@ -134,7 +134,6 @@ class WaypointManager:
         prob.solve(solver=cp.OSQP, verbose=False)
 
         new_alpha = alpha.value
-        print(alpha.value)
         optimal_x = self.centerline_discrete[:, 0] + new_alpha * self.normals[:, 0]
         optimal_y = self.centerline_discrete[:, 1] + new_alpha * self.normals[:, 1]
         self.centerline_discrete = np.vstack((optimal_x, optimal_y)).T

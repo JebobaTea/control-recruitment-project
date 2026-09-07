@@ -7,7 +7,11 @@ from LongPController import LongPController
 sim = Simulator()
 # this particular track repeats after s=105 along centerline
 WaypointManager = WaypointUtility.WaypointManager(waypoint_count=200, track_len=105)
+np.save("wpt_base", WaypointManager.centerline_discrete)
+
 WaypointManager.generate_raceline(search_width=(-2, 2))
+
+np.save("wpt_opt", WaypointManager.centerline_discrete)
 
 v_log = []
 kappa_log = []
