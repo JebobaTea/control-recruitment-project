@@ -14,7 +14,7 @@ np.save("wpt_opt", WaypointManager.raceline)
 sim = Simulator()
 
 v_log = []
-tf = 90
+tf = 15
 n = 0
 
 def controller(x):

@@ -22,7 +22,7 @@ class ModelPredictiveController:
         self.temp_magic_lookahead = 2.5
         self.position_weight = 1250.0
         self.heading_weight = 100.0
-        self.speed_weight = 300.0
+        self.speed_weight = 400.0
         self.effort_weight = 10.0
 
     def _sim_bicycle(self, state, ctrl):
@@ -73,17 +73,23 @@ class ModelPredictiveController:
     def _breaks_constraints(self, state, ctrl):
         ctrl = ctrl.reshape(self.window, 2)
         state_new = state[:]
+        res = []
         for ctrl_this_frame in ctrl:
             state_new = self._sim_bicycle(state_new, ctrl_this_frame)
             x_new, y_new, phi_new, v_new, theta_new = state_new
             # to hell with protected members, i'm sure as hell not checking this myself
             if self.Simulator._check_collision(state_new):
-                return -1
-            #if self.Simulator._check_accel(state_new, ctrl_this_frame):
-                #return -1
-            if theta_new > self.wheel_constraints[1] or theta_new < self.wheel_constraints[0]:
-                return -1
-        return 1 # satisfied if return value is non-negative
+                res.append(-1)
+            else:
+                res.append(1)
+            # change from previous 1 vs -1 approach:
+            # apparently optimizer throws a freaking hissy fit if the constraint returns are on/off
+            # instead of smooth and continuous??????? what
+            new_accel = self.Simulator._get_accel(state_new, ctrl_this_frame)
+            res.append(12 - new_accel)
+            res.append(-(self.wheel_constraints[0] - theta_new))
+            res.append(self.wheel_constraints[1] - theta_new)
+        return np.array(res) # also forgot inequality operator functions on entire np arrays
 
     def get_inputs(self, state):
         # why is there no e in np.zeros
