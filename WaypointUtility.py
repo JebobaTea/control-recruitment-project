@@ -36,7 +36,7 @@ class WaypointManager:
         self.last_idx = 0
         self.raceline = None
         self.normals = None
-        self.magic_max_velocity = 20
+        self.magic_max_velocity = 8
 
     def search_for_goalpoint(self, current_x: float, current_y: float, lookahead_dist: float, use_raceline=True):
         # referenced from

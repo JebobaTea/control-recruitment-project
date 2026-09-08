@@ -14,8 +14,14 @@ np.save("wpt_opt", WaypointManager.raceline)
 sim = Simulator()
 
 v_log = []
+tf = 20
+n = 0
 
 def controller(x):
+    global n
+    if n % 100 == 0:
+        print("solve progress (pct): ", f"{n / tf : .2f}")
+    n += 1
     """controller for a car
 
     Args:
@@ -38,18 +44,18 @@ def controller(x):
     state = [xpos, ypos, phi, v, theta]
     #steer, kappa, turn_radius = LateralController.get_steering_input(state, target_waypoint)
     #throttle, target_speed = LongitudinalController.get_accel_input(kappa, v)
-    MPC = ModelPredictiveController(wpt_mgr=WaypointManager, window=5, wheelbase=1.58, dt=0.1,
+    MPC = ModelPredictiveController(wpt_mgr=WaypointManager, sim=sim, window=5, wheelbase=1.58, dt=0.1,
                                     steering_constraints=(-1.0, 1.0), wheel_constraints=(-0.7, 0.7),
                                     throttle_constraints=(-10.0, 4.0))
     throttle, steer = MPC.get_inputs(state)
 
-    debug_array = [v, throttle, steer]
+    debug_array = [v, throttle, steer, phi, theta]
 
     v_log.append(v)
     return np.array([throttle, steer]), np.array([0, 0]), debug_array # too lazy
 
 sim.set_controller(controller)
-sim.run()
+sim.run(tf=tf)
 sim.animate()
 sim.plot()
 results = sim.get_results()
