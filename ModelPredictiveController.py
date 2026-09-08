@@ -6,7 +6,7 @@ from WaypointUtility import WaypointManager, dist_euclid, pt_dist
 class ModelPredictiveController:
     def __init__(self, wpt_mgr:WaypointManager, window:int=5, wheelbase=1.58, dt: float=0.1,
                  steering_constraints: tuple[float, float]=(-1.0, 1.0),
-                 wheel_constraints: tuple[float, float]=(-0.7, 7),
+                 wheel_constraints: tuple[float, float]=(-0.7, 0.7),
                  throttle_constraints: tuple[float, float]=(-10.0, 4.0)):
         self.wheelbase = wheelbase
         self.dt = dt
@@ -18,9 +18,9 @@ class ModelPredictiveController:
 
         # magic values, for now
         self.temp_magic_lookahead = 5.0
-        self.position_weight = 10.0
+        self.position_weight = 100.0
         self.heading_weight = 100.0
-        self.speed_weight = 100.0
+        self.speed_weight = 10.0
         self.effort_weight = 1.0
 
     def _sim_bicycle(self, state, ctrl):
@@ -33,11 +33,12 @@ class ModelPredictiveController:
         phi_new = phi_current + self.dt * (v_current / self.wheelbase) * math.tan(theta_current)
         theta_new = theta_current + self.dt * theta_dot
 
-        return np.array([x_new, y_new, v_new, phi_new, theta_new])
+        return np.array([x_new, y_new, phi_new, v_new, theta_new])
 
     def _cost(self, state, ctrl):
         x_current, y_current, phi_current, v_current, theta_current = state
         references = self.WaypointManager.get_optimal_states(x_current, y_current, self.temp_magic_lookahead, self.window)
+
         # ctrl is in the shape of a 1d array, wherein the inputs come in format
         # [a_1, theta_dot_1, a_2, theta_dot_2 ... a_n, theta_dot_n]
         ctrl = ctrl.reshape(self.window, 2)
@@ -65,7 +66,6 @@ class ModelPredictiveController:
 
             effort = ctrl_this_frame[0] ** 2 + ctrl_this_frame[1] ** 2
             cost += effort
-
         return cost
 
     def get_inputs(self, state):
@@ -84,4 +84,4 @@ class ModelPredictiveController:
             inp_optimal = inp.x.reshape(self.window, 2)
             return inp_optimal[0]
         else:
-            return ([0, 0])
+            return [0, 0]

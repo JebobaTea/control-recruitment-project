@@ -18,7 +18,10 @@ def menger(pt1, pt2, pt3):
     s3 = pt_dist(pt1, pt3)
     sp = (s1 + s2 + s3) / 2
     a = math.sqrt(sp * (sp - s1) * (sp - s2) * (sp - s3))
-    kappa = (4 * a) / (s1 * s2 * s3)
+    denom = (s1 * s2 * s3)
+    if denom == 0:
+        denom = 0.00001
+    kappa = (4 * a) / denom
     if kappa == 0:
         r = 1000000
     else:
@@ -33,6 +36,7 @@ class WaypointManager:
         self.last_idx = 0
         self.raceline = None
         self.normals = None
+        self.magic_max_velocity = 20
 
     def search_for_goalpoint(self, current_x: float, current_y: float, lookahead_dist: float, use_raceline=True):
         # referenced from
@@ -174,6 +178,7 @@ class WaypointManager:
 
             optimal_position = curr_pt
             optimal_velocity = self.get_maximum_turn_velocity(radius, max_a_centr)
+            optimal_velocity = np.clip(optimal_velocity, 0, self.magic_max_velocity)
             optimal_heading = np.arctan2(tangent[1], tangent[0])
 
             states.append([optimal_position[0], optimal_position[1], optimal_heading, optimal_velocity])
