@@ -36,7 +36,7 @@ class WaypointManager:
         self.last_idx = 0
         self.raceline = None
         self.normals = None
-        self.magic_max_velocity = 8
+        self.magic_max_velocity = 12
 
     def search_for_goalpoint(self, current_x: float, current_y: float, lookahead_dist: float, use_raceline=True):
         # referenced from
@@ -159,7 +159,7 @@ class WaypointManager:
         optimal_y = self.centerline_discrete[:, 1] + new_alpha * self.normals[:, 1]
         self.raceline = np.vstack((optimal_x, optimal_y)).T
 
-    def get_optimal_states(self, current_x: float, current_y: float, lookahead_dist: float, window: int, use_raceline:bool=True, max_a_centr: float=3.0):
+    def get_optimal_states(self, current_x: float, current_y: float, lookahead_dist: float, window: int, use_raceline:bool=True, max_a_centr: float=5):
         starting_waypoint, starting_idx = self.search_for_goalpoint(current_x, current_y, lookahead_dist, use_raceline)
         path = self.raceline if (use_raceline and self.raceline is not None) else self.centerline_discrete
         idx_curr = starting_idx

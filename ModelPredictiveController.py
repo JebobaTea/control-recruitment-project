@@ -20,9 +20,9 @@ class ModelPredictiveController:
 
         # magic values, for now
         self.temp_magic_lookahead = 2.5
-        self.position_weight = 1250.0
+        self.position_weight = 1500.0
         self.heading_weight = 100.0
-        self.speed_weight = 400.0
+        self.speed_weight = 500.0
         self.effort_weight = 10.0
 
     def _sim_bicycle(self, state, ctrl):
@@ -86,7 +86,7 @@ class ModelPredictiveController:
             # apparently optimizer throws a freaking hissy fit if the constraint returns are on/off
             # instead of smooth and continuous??????? what
             new_accel = self.Simulator._get_accel(state_new, ctrl_this_frame)
-            res.append(12 - new_accel)
+            res.append(11 - new_accel) # give a little padding to constraints as the matlab guy said !!
             res.append(-(self.wheel_constraints[0] - theta_new))
             res.append(self.wheel_constraints[1] - theta_new)
         return np.array(res) # also forgot inequality operator functions on entire np arrays
