@@ -35,7 +35,8 @@ def controller(x):
     LongitudinalController = LongPController(kp=1, kc=5, min_speed=6, max_speed=12, throttle_constraints=(-8, 4))
     target_waypoint, idx = WaypointManager.search_for_goalpoint(xpos, ypos, LateralController.get_lookahead(v))
 
-    steer, kappa, turn_radius = LateralController.get_steering_input(v, target_waypoint, xpos, ypos, theta, phi)
+    state = [xpos, ypos, phi, v, theta]
+    steer, kappa, turn_radius = LateralController.get_steering_input(state, target_waypoint)
     throttle, target_speed = LongitudinalController.get_accel_input(kappa, v)
 
     debug_array = [v, target_speed, kappa, throttle]

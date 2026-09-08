@@ -139,8 +139,9 @@ class WaypointManager:
             idx_next = (i + 1) % self.waypoint_count
             idx_prev = (i - 1) % self.waypoint_count
 
-            # cannot use kappa for minimum curvature QP optimization because breaks DCP
+            # not using kappa for minimum curvature QP optimization because breaks DCP
             # (cannot divide by optimization variable)
+            # TODO: test using actual curvature with DNLP flag enabled
             d2x = x_shifted[idx_next] - 2 * x_shifted[i] + x_shifted[idx_prev]
             d2y = y_shifted[idx_next] - 2 * y_shifted[i] + y_shifted[idx_prev]
             cost = cost + cp.square(d2x) + cp.square(d2y)
@@ -180,5 +181,5 @@ class WaypointManager:
             idx_curr = idx_next
         return np.array(states)
 
-    def get_maximum_turn_velocity(self, r, accel_cap):
+    def get_maximum_turn_velocity(self, r: float, accel_cap: float) -> float:
         return math.sqrt(accel_cap * r)

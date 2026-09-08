@@ -16,7 +16,8 @@ class PurePursuitController:
     def get_lookahead(self, v_current):
         return np.clip(self.kdd * v_current, self.min_lookahead, self.max_lookahead)
 
-    def get_steering_input(self, v_current, target_waypoint, current_x, current_y, theta, phi):
+    def get_steering_input(self, state, target_waypoint):
+        current_x, current_y, phi, v_current, theta = state
         lookahead_dist = self.get_lookahead(v_current)
 
         target_x = target_waypoint[0]
