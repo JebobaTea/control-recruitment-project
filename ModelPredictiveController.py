@@ -103,7 +103,7 @@ class ModelPredictiveController:
             "fun": (lambda y: self._breaks_constraints(state, y))
         }
 
-        inp = minimize(fun=lambda x: self._cost(state, x), x0=initial_guess, bounds=bounds, constraints=constraints, method="SLSQP", options={"maxiter": 150})
+        inp = minimize(fun=lambda x: self._cost(state, x), x0=initial_guess, bounds=bounds, constraints=constraints, method="SLSQP", options={"maxiter": 200})
         if inp.success:
             inp_optimal = inp.x.reshape(self.window, 2)
             return inp_optimal[0]

@@ -159,7 +159,7 @@ class WaypointManager:
         optimal_y = self.centerline_discrete[:, 1] + new_alpha * self.normals[:, 1]
         self.raceline = np.vstack((optimal_x, optimal_y)).T
 
-    def get_optimal_states(self, current_x: float, current_y: float, lookahead_dist: float, window: int, use_raceline:bool=True, max_a_centr: float=5.0):
+    def get_optimal_states(self, current_x: float, current_y: float, lookahead_dist: float, window: int, use_raceline:bool=True, max_a_centr: float=3.0):
         starting_waypoint, starting_idx = self.search_for_goalpoint(current_x, current_y, lookahead_dist, use_raceline)
         path = self.raceline if (use_raceline and self.raceline is not None) else self.centerline_discrete
         idx_curr = starting_idx
