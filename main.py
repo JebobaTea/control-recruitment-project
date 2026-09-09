@@ -5,7 +5,6 @@ from simulator import Simulator
 from PurePursuitController import PurePursuitController
 from LongPController import LongPController
 from ModelPredictiveController import ModelPredictiveController
-from time import process_time
 
 """
 
@@ -14,11 +13,11 @@ EVAL CONFIG
 TF: float (seconds) simulation run duration
 CONTROLLER: string (one of the following: PURE_PURSUIT, PID, MPC) which control method to use
             note that only MPC and pure pursuit have valid lap completions
-
+            also note that MPC optimization takes ~0.02s per timestep, so eval will take ~2*TF seconds
+            
 """
 TF = 15
 CONTROLLER = "MPC"
-
 
 # this particular track repeats after s=104 along centerline
 WaypointManager = WaypointUtility.WaypointManager(waypoint_count=200, track_len=104)
@@ -28,21 +27,8 @@ np.save("wpt_opt", WaypointManager.raceline)
 
 sim = Simulator()
 
-v_log = []
-t_solves = []
-n = 0
 
 def controller(x):
-    global n
-    global t_solves
-    if n % 200 == 0 and n != 0:
-        np_t_solves = np.array(t_solves)
-        t_avg = np.mean(np_t_solves)
-        print("solve progress (pct): ", f"{n / TF : .2f}")
-        print("avg MPC solve time per timestep: ", f"{t_avg : .3f}", "s")
-
-    t_solves = []
-    n += 1
     """controller for a car
 
     Args:
@@ -58,8 +44,9 @@ def controller(x):
     theta   = x[4]                  # current steering angle
     
     ... # YOUR CODE HERE
-    target_waypoint = np.array([0, 0])
+
     state = [xpos, ypos, phi, v, theta]
+
     if CONTROLLER == "MPC":
         # admittedly, it'd be cleaner to do some cool packing and unpacking to pass arguments, but we ball
         MPC = ModelPredictiveController(wpt_mgr=WaypointManager, sim=sim, window=5, wheelbase=1.58, dt=0.1,
@@ -67,10 +54,7 @@ def controller(x):
                                         throttle_constraints=(-10.0, 4.0), position_weight=1750.0,
                                         heading_weight=100.0, speed_weight=500.0, effort_weight=10.0, lookahead=2.5,
                                         v_target_range=(0, 12))
-        t1 = process_time()
         throttle, steer = MPC.get_inputs(state)
-        t2 = process_time()
-        t_solves.append(t2 - t1)
     elif CONTROLLER == "PID":
         gain_schedule = {
             "5": {
@@ -107,16 +91,10 @@ def controller(x):
         print("hey man this is a wendy's we don't sell that here, try a different controller config string")
         raise NotImplementedError
 
-    debug_array = [v, throttle, steer, phi, theta]
-
-    v_log.append(v)
-    return np.array([throttle, steer]), target_waypoint, debug_array # too lazy
+    return np.array([throttle, steer])
 
 sim.set_controller(controller)
 sim.run(tf=TF)
 sim.animate()
 sim.plot()
 results = sim.get_results()
-print(np.count_nonzero(np.array(results[3])))
-print(np.count_nonzero(np.array(results[4])))
-print(np.mean(np.array(v_log)))
