@@ -1,7 +1,7 @@
 import numpy as np
+import WaypointUtility
 from LatPIDController import LatPIDController
 from simulator import Simulator
-import WaypointUtility
 from PurePursuitController import PurePursuitController
 from LongPController import LongPController
 from ModelPredictiveController import ModelPredictiveController
@@ -17,7 +17,7 @@ CONTROLLER: string (one of the following: PURE_PURSUIT, PID, MPC) which control 
 
 """
 TF = 15
-CONTROLLER = "PURE_PURSUIT"
+CONTROLLER = "MPC"
 
 
 # this particular track repeats after s=104 along centerline
