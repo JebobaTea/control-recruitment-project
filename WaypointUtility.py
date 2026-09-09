@@ -19,6 +19,7 @@ def menger(pt1, pt2, pt3):
     sp = (s1 + s2 + s3) / 2
     a = math.sqrt(sp * (sp - s1) * (sp - s2) * (sp - s3))
     denom = (s1 * s2 * s3)
+    # quick and dirty divby0 fix
     if denom == 0:
         denom = 0.00001
     kappa = (4 * a) / denom
@@ -36,7 +37,6 @@ class WaypointManager:
         self.last_idx = 0
         self.raceline = None
         self.normals = None
-        self.magic_max_velocity = 12
 
     def search_for_goalpoint(self, current_x: float, current_y: float, lookahead_dist: float, use_raceline=True):
         # referenced from
@@ -66,6 +66,7 @@ class WaypointManager:
             D = x1 * y2 - x2 * y1
             discriminant = (lookahead_dist ** 2) * (dr ** 2) - D ** 2
             if discriminant >= 0:
+                # solve for intersection
                 sol_x1 = (D * dy + sign(dy) * dx * np.sqrt(discriminant)) / dr ** 2
                 sol_x2 = (D * dy - sign(dy) * dx * np.sqrt(discriminant)) / dr ** 2
                 sol_y1 = (- D * dx + abs(dy) * np.sqrt(discriminant)) / dr ** 2
@@ -145,7 +146,7 @@ class WaypointManager:
 
             # not using kappa for minimum curvature QP optimization because breaks DCP
             # (cannot divide by optimization variable)
-            # TODO: test using actual curvature with DNLP flag enabled
+            # TODO: test using actual curvature with DNLP flag enabled, or change solver
             d2x = x_shifted[idx_next] - 2 * x_shifted[i] + x_shifted[idx_prev]
             d2y = y_shifted[idx_next] - 2 * y_shifted[i] + y_shifted[idx_prev]
             cost = cost + cp.square(d2x) + cp.square(d2y)
@@ -159,7 +160,8 @@ class WaypointManager:
         optimal_y = self.centerline_discrete[:, 1] + new_alpha * self.normals[:, 1]
         self.raceline = np.vstack((optimal_x, optimal_y)).T
 
-    def get_optimal_states(self, current_x: float, current_y: float, lookahead_dist: float, window: int, use_raceline:bool=True, max_a_centr: float=5):
+    def get_optimal_states(self, current_x: float, current_y: float, lookahead_dist: float, window: int,
+                           use_raceline :bool=True, max_a_centr: float=5, v_target: tuple[float, float]=(0,12)):
         starting_waypoint, starting_idx = self.search_for_goalpoint(current_x, current_y, lookahead_dist, use_raceline)
         path = self.raceline if (use_raceline and self.raceline is not None) else self.centerline_discrete
         idx_curr = starting_idx
@@ -178,7 +180,7 @@ class WaypointManager:
 
             optimal_position = curr_pt
             optimal_velocity = self.get_maximum_turn_velocity(radius, max_a_centr)
-            optimal_velocity = np.clip(optimal_velocity, 0, self.magic_max_velocity)
+            optimal_velocity = np.clip(optimal_velocity, v_target[0], v_target[1])
             optimal_heading = np.arctan2(tangent[1], tangent[0])
 
             states.append([optimal_position[0], optimal_position[1], optimal_heading, optimal_velocity])

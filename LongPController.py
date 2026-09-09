@@ -15,3 +15,11 @@ class LongPController:
         d_speed = target_speed - current_speed
         throttle = self.kp * d_speed
         return np.clip(throttle, self.throttle_constraints[0], self.throttle_constraints[1]), target_speed
+
+    def get_accel_by_error(self, error, current_speed):
+        target_speed = self.max_speed * (1 / (1 + error))
+        if current_speed < self.min_speed:
+            target_speed = self.max_speed
+        d_speed = target_speed - current_speed
+        throttle = self.kp * d_speed
+        return np.clip(throttle, self.throttle_constraints[0], self.throttle_constraints[1]), target_speed
