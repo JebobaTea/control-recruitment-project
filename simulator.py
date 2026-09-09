@@ -3,10 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation, patches, transforms
 
-np.set_printoptions(formatter={'float': '{:0.2f}'.format})
-
 _centerline = ca.external(
-    'centerline', 
+    'centerline',
     ca.Importer(
         'assets/cline_func.c',
         'shell'
@@ -36,8 +34,6 @@ class Simulator:
         self.dynamics = ca.external('F', ca.Importer('assets/system_dynamics.c', 'shell'))
         self.left_cones = np.load('assets/left.npy')
         self.right_cones = np.load('assets/right.npy')
-        self.wpt_base = np.load('wpt_base.npy')
-        self.wpt_opt = np.load('wpt_opt.npy')
         self._cones = np.concatenate([self.left_cones, self.right_cones], axis=0)
         self.car_outline = np.load('assets/pts_mat.npy')
         self.A = np.load('assets/a_mat.npy')
@@ -63,7 +59,7 @@ class Simulator:
             (float, float): (min, max) angle of front tires, in radians.
         """
         return self._steering_limits
-    @property 
+    @property
     def lbu(self):
         """get the lower bound on the control matrix $u=[a, \dot{\phi}]$
 
@@ -102,7 +98,7 @@ class Simulator:
          + ((state[3]**2 / l) * np.sin(np.arctan(0.5 * np.tan(state[4]))))**2
         )
     def _check_accel(self, state, control):
-        return self._get_accel(state, control) > 12 
+        return self._get_accel(state, control) > 12
     def run(self, tf=90):
         """Run the simulator with the given controller for `tf` seconds, storing results inside this Simulator.
 
@@ -112,25 +108,23 @@ class Simulator:
         self.log = []
         state = np.zeros(5)
         for t in np.arange(0, tf, 0.01):
-            u, tlog, debug = self.cb(state)
+            u = self.cb(state)
             assert isinstance(u, np.ndarray), f"expected numpy array from controller but got type {type(u)}"
             assert u.shape==(2,), f"expected shape (2,) from controller but received {u.shape}"
             u = np.array([
                 np.clip(u[0], *self._accel_limits),
                 np.clip(u[1], *self._steering_vel_limits)
             ])
-            tlog = np.array([tlog])
-            debug = np.array([debug])
 
             if ((state[4] > self._steering_limits[1] and u[1] > 0)
              or (state[4] < self._steering_limits[0] and u[1] < 0)):
                 u[1] = 0
             crash = self._check_collision(state)
             slip = self._check_accel(state, u)
-            self.log.append((t, state, u, crash, slip, tlog, debug))
+            self.log.append((t, state, u, crash, slip))
             state = self.dynamics(state, u).toarray().flatten()
     def get_results(self):
-        """get the simulation results. gives a tuple of arrays: (timestamps, states, controls, crash, slip). 
+        """get the simulation results. gives a tuple of arrays: (timestamps, states, controls, crash, slip).
         `crash` is a bool array which is true when the car is colliding with a cone.
         `slip` is a bool array which is true when the car is exceeding friction limits.
 
@@ -138,7 +132,7 @@ class Simulator:
             ValueError: if the sim has not been run, there will be no results.
 
         Returns:
-            (array, array, array, array, array, array): shapes (N,), (5, N), (2, N), (N,), (N,), (N,). time series data as described above.
+            (array, array, array, array, array): shapes (N,), (5, N), (2, N), (N,), (N,). time series data as described above.
         """
         try: log = self.log
         except: raise ValueError("cannot animate; no results exist. Did you .run() the simulator?")
@@ -147,16 +141,14 @@ class Simulator:
         us = np.concatenate([i[2][:, np.newaxis] for i in self.log], axis=1)
         crash  = np.array([i[3] for i in self.log])
         slip  = np.array([i[4] for i in self.log])
-        targets = np.array([i[5] for i in self.log])
-        debug = np.array([i[6] for i in self.log])
-        return (ts, xs, us, crash, slip, targets, debug)
+        return (ts, xs, us, crash, slip)
     def plot(self, block=True):
         """plot the last run of the simulator.
 
         Args:
             block (bool, optional): the `block` argument to plt.show(). Defaults to True.
         """
-        ts, xs, us, crash, slip, targets, debug = self.get_results()
+        ts, xs, us, crash, slip = self.get_results()
         fig, axs = plt.subplots(7, sharex=True)
 
         axs[0].plot(ts, xs[0]); axs[0].set_ylabel('x pos (m)')
@@ -165,8 +157,8 @@ class Simulator:
         axs[3].plot(ts, xs[3]); axs[3].set_ylabel('velocity (m/s)')
         axs[4].plot(ts, xs[4]); axs[4].set_ylabel('steering angle (rad)')
 
-        axs[5].plot(ts, us[0]); axs[5].set_ylabel('fwd acc')
-        axs[6].plot(ts, us[1]); axs[6].set_ylabel('steer v')
+        axs[5].plot(ts, us[0]); axs[5].set_ylabel('fwd accel (m/s^2)')
+        axs[6].plot(ts, us[1]); axs[6].set_ylabel('steering velocity (rad/s)')
         for i in range(5):
             axs[i].scatter(ts[crash], xs[i, crash], color='tab:red', marker='+')
             axs[i].scatter(ts[slip], xs[i, slip], color='tab:orange', marker='x')
@@ -187,23 +179,20 @@ class Simulator:
         axs[0].set_aspect('equal')
         axs[1].set_aspect(1)
         axs[0].scatter(*self.left_cones.T, color='tab:blue')
-        axs[0].scatter(*self.wpt_base.T, color='tab:red', s=2)
-        axs[0].scatter(*self.wpt_opt.T, color='tab:green', s=2)
         axs[0].scatter(*self.right_cones.T, color='tab:orange')
         outline = axs[0].add_patch(patches.Polygon(self.car_outline, fill=True, closed=True, facecolor='lightblue', edgecolor='black'))
         posearrow = axs[0].add_patch(patches.FancyArrow(0, 0, 1, 0, width=0.1, color='tab:red'))
-
         accel = axs[1].plot([0],[0])[0]
         axs[0].set_title('car pose')
 
         axs[1].set_title('net acceleration')
         axs[1].set_xlabel('time (s)')
         axs[1].set_ylabel('acceleration (m/s^2)')
-        ts, xs, us, crash, slip, targets, debug = self.get_results()
+
+        ts, xs, us, crash, slip = self.get_results()
         accel_values = np.array([self._get_accel(x, u) for x, u in zip(xs.T, us.T)])
         axs[1].hlines([12], [0], [np.max(ts)], linestyles='dashed', color='tab:red')
         collision_patches = []
-        targetpt = axs[0].scatter([0], [0], color='tab:pink')
         def frame(i):
             outline_points = ((self.R(xs[2, i])@self.car_outline.T).T + xs[0:2, i])
             arrow_data = dict(
@@ -221,9 +210,7 @@ class Simulator:
             posearrow.set_data(**arrow_data)
             accel.set_xdata(ts[:i+1])
             accel.set_ydata(accel_values[:i+1])
-            print(debug[i])
-            targetpt.set_offsets([[targets[i][0][0], targets[i][0][1]]])
-            return [accel, outline, posearrow, targetpt] + collision_patches
+            return [accel, outline, posearrow] + collision_patches
 
         anim = animation.FuncAnimation(fig, frame, len(ts), interval=10)
         if save:
