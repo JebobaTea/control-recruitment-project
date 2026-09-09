@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from matplotlib.path import Path
 from scipy.optimize import minimize # cvxpy can't handle trigonometric functions, sadge, so scipy instead
 from WaypointUtility import WaypointManager, dist_euclid
 from simulator import Simulator
@@ -80,8 +81,12 @@ class ModelPredictiveController:
         for ctrl_this_frame in ctrl:
             state_new = self._sim_bicycle(state_new, ctrl_this_frame)
             x_new, y_new, phi_new, v_new, theta_new = state_new
-            # easier and less time consuming than importing cones and doing hitbox check, so cheeky hack fix
-            if self.Simulator._check_collision(state_new):
+            # collision check that doesn't cheat
+            # https://stackoverflow.com/questions/60841277/determining-if-vertices-lie-within-a-set-vertices
+            cones = self.Simulator.cones
+            vertices = self.Simulator.car_vertices
+            path = Path(vertices, closed=True)
+            if path.contains_points(cones).any():
                 res.append(-1)
             else:
                 res.append(1)
