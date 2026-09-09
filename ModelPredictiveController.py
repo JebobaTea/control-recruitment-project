@@ -41,6 +41,15 @@ class ModelPredictiveController:
 
         return np.array([x_new, y_new, phi_new, v_new, theta_new])
 
+    def _bicycle_accel_net(self, state, ctrl):
+        x_current, y_current, phi_current, v_current, theta_current = state
+        a, theta_dot = ctrl
+        # a_centripetal = v^2 / r, where r = L / tan(theta) = v^2 * tan(theta) / L
+        a_centripetal = (v_current ** 2 * math.tan(theta_current)) / self.wheelbase
+        a_tangential = a
+        a_total = math.sqrt(a_centripetal ** 2 + a_tangential ** 2)
+        return a_total
+
     def _cost(self, state, ctrl):
         x_current, y_current, phi_current, v_current, theta_current = state
         references = self.WaypointManager.get_optimal_states(x_current, y_current, lookahead_dist=self.lookahead, window=self.window, v_target=self.v_target_range)
@@ -93,7 +102,7 @@ class ModelPredictiveController:
             # change from previous 1 vs -1 approach:
             # optimizer throws a hissy fit if the constraint returns are on/off
             # instead of smooth and continuous
-            new_accel = self.Simulator._get_accel(state_new, ctrl_this_frame)
+            new_accel = self._bicycle_accel_net(state_new, ctrl_this_frame) # no more illegal calls yay, albeit i don't understand the diff in implementation with simulator version
             res.append(11 - new_accel) # constraints should be padded conservatively
             res.append(-(self.wheel_constraints[0] - theta_new))
             res.append(self.wheel_constraints[1] - theta_new)
