@@ -26,7 +26,6 @@ np.save("wpt_base", WaypointManager.centerline_discrete)
 np.save("wpt_opt", WaypointManager.raceline)
 
 sim = Simulator()
-vl = []
 
 def controller(x):
     """controller for a car
@@ -54,6 +53,7 @@ def controller(x):
                                         throttle_constraints=(-10.0, 4.0), position_weight=1750.0,
                                         heading_weight=200.0, speed_weight=200.0, effort_weight=10.0, lookahead=1.2,
                                         v_target_range=(0, 17), max_accel=11.0)
+        # non-raceline: lookahead 2.0, max_accel 10.0, v_target (0,10), speed_weight 200.0, heading_weight 100.0
         throttle, steer = MPC.get_inputs(state)
     elif CONTROLLER == "PID":
         gain_schedule = {
@@ -90,7 +90,6 @@ def controller(x):
     else:
         print("hey man this is a wendy's we don't sell that here, try a different controller config string")
         raise NotImplementedError
-    vl.append(v)
     return np.array([throttle, steer])
 
 sim.set_controller(controller)
@@ -98,4 +97,3 @@ sim.run(tf=TF)
 sim.animate()
 sim.plot()
 results = sim.get_results()
-print(np.mean(np.array(vl)))
