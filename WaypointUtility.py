@@ -17,7 +17,7 @@ def menger(pt1, pt2, pt3):
     s2 = pt_dist(pt2, pt3)
     s3 = pt_dist(pt1, pt3)
     sp = (s1 + s2 + s3) / 2
-    a = math.sqrt(sp * (sp - s1) * (sp - s2) * (sp - s3))
+    a = math.sqrt(abs(sp * (sp - s1) * (sp - s2) * (sp - s3)))
     denom = (s1 * s2 * s3)
     # quick and dirty divby0 fix
     if denom == 0:
@@ -160,8 +160,8 @@ class WaypointManager:
         optimal_y = self.centerline_discrete[:, 1] + new_alpha * self.normals[:, 1]
         self.raceline = np.vstack((optimal_x, optimal_y)).T
 
-    def get_optimal_states(self, current_x: float, current_y: float, lookahead_dist: float, window: int,
-                           use_raceline :bool=True, max_a_centr: float=5, v_target: tuple[float, float]=(0,12)):
+    def get_optimal_states(self, ctrl, current_x: float, current_y: float, lookahead_dist: float, window: int,
+                           use_raceline: bool=True, v_target: tuple[float, float]=(0,12), max_accel: float=12.0):
         starting_waypoint, starting_idx = self.search_for_goalpoint(current_x, current_y, lookahead_dist, use_raceline)
         path = self.raceline if (use_raceline and self.raceline is not None) else self.centerline_discrete
         idx_curr = starting_idx
@@ -178,8 +178,11 @@ class WaypointManager:
             kappa, radius = menger(prev_pt, curr_pt, next_pt)
             tangent = next_pt - curr_pt
 
+            requested_a_tangential = abs(ctrl[i * 2])
+            max_a_centripetal = math.sqrt(max(max_accel ** 2 - requested_a_tangential ** 2, 0))
+
             optimal_position = curr_pt
-            optimal_velocity = self.get_maximum_turn_velocity(radius, max_a_centr)
+            optimal_velocity = self.get_maximum_turn_velocity(radius, max_a_centripetal)
             optimal_velocity = np.clip(optimal_velocity, v_target[0], v_target[1])
             optimal_heading = np.arctan2(tangent[1], tangent[0])
 

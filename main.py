@@ -16,7 +16,7 @@ CONTROLLER: string (one of the following: PURE_PURSUIT, PID, MPC) which control 
             also note that MPC optimization takes ~0.02s per timestep, so eval will take ~2*TF seconds
             
 """
-TF = 15
+TF = 90
 CONTROLLER = "MPC"
 
 # this particular track repeats after s=104 along centerline
@@ -26,7 +26,7 @@ np.save("wpt_base", WaypointManager.centerline_discrete)
 np.save("wpt_opt", WaypointManager.raceline)
 
 sim = Simulator()
-
+vl = []
 
 def controller(x):
     """controller for a car
@@ -52,19 +52,19 @@ def controller(x):
         MPC = ModelPredictiveController(wpt_mgr=WaypointManager, sim=sim, window=5, wheelbase=1.58, dt=0.1,
                                         steering_constraints=(-1.0, 1.0), wheel_constraints=(-0.7, 0.7),
                                         throttle_constraints=(-10.0, 4.0), position_weight=1750.0,
-                                        heading_weight=100.0, speed_weight=500.0, effort_weight=10.0, lookahead=2.5,
-                                        v_target_range=(0, 12))
+                                        heading_weight=200.0, speed_weight=200.0, effort_weight=10.0, lookahead=1.2,
+                                        v_target_range=(0, 17), max_accel=11.0)
         throttle, steer = MPC.get_inputs(state)
     elif CONTROLLER == "PID":
         gain_schedule = {
             "5": {
                 "kp": 0.4,
-                "kd": 0.2,
+                "kd": 0.4,
                 "ki": 0.1
             },
             "10": {
                 "kp": 0.3,
-                "kd": 0.15,
+                "kd": 0.4,
                 "ki": 0.12
             }
         }
@@ -90,7 +90,7 @@ def controller(x):
     else:
         print("hey man this is a wendy's we don't sell that here, try a different controller config string")
         raise NotImplementedError
-
+    vl.append(v)
     return np.array([throttle, steer])
 
 sim.set_controller(controller)
@@ -98,3 +98,4 @@ sim.run(tf=TF)
 sim.animate()
 sim.plot()
 results = sim.get_results()
+print(np.mean(np.array(vl)))

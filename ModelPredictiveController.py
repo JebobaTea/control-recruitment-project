@@ -13,7 +13,7 @@ class ModelPredictiveController:
                  throttle_constraints: tuple[float, float]=(-10.0, 4.0),
                  position_weight: float=1500.0, heading_weight: float=100.0,
                  speed_weight: float=500.0, effort_weight: float=10.0, lookahead: float=2.5,
-                 v_target_range: tuple[float, float]=(0, 12)):
+                 v_target_range: tuple[float, float]=(0, 12), max_accel=12.0):
         self.wheelbase = wheelbase
         self.dt = dt
         self.steering_constraints = steering_constraints
@@ -28,6 +28,8 @@ class ModelPredictiveController:
         self.speed_weight = speed_weight
         self.effort_weight = effort_weight
         self.v_target_range = v_target_range
+        self.max_accel = max_accel
+        self.last_result = [0, 0]
 
     def _sim_bicycle(self, state, ctrl):
         x_current, y_current, phi_current, v_current, theta_current = state
@@ -52,7 +54,7 @@ class ModelPredictiveController:
 
     def _cost(self, state, ctrl):
         x_current, y_current, phi_current, v_current, theta_current = state
-        references = self.WaypointManager.get_optimal_states(x_current, y_current, lookahead_dist=self.lookahead, window=self.window, v_target=self.v_target_range)
+        references = self.WaypointManager.get_optimal_states(ctrl, x_current, y_current, max_accel=self.max_accel,lookahead_dist=self.lookahead, window=self.window, v_target=self.v_target_range, use_raceline=True)
 
         # ctrl is in the shape of a 1d array, wherein the inputs come in format
         # [a_1, theta_dot_1, a_2, theta_dot_2 ... a_n, theta_dot_n]
@@ -66,7 +68,6 @@ class ModelPredictiveController:
             state_new = self._sim_bicycle(state_new, ctrl_this_frame)
             x_new, y_new, phi_new, v_new, theta_new = state_new
             x_target, y_target, phi_target, v_target = ref_this_frame
-
             pos_error = dist_euclid(x_new, y_new, x_target, y_target)
             cost += self.position_weight * pos_error ** 2
 
@@ -103,7 +104,7 @@ class ModelPredictiveController:
             # optimizer throws a hissy fit if the constraint returns are on/off
             # instead of smooth and continuous
             new_accel = self._bicycle_accel_net(state_new, ctrl_this_frame) # no more illegal calls yay, albeit i don't understand the diff in implementation with simulator version
-            res.append(11 - new_accel) # constraints should be padded conservatively
+            res.append(self.max_accel - new_accel) # constraints should be padded conservatively
             res.append(-(self.wheel_constraints[0] - theta_new))
             res.append(self.wheel_constraints[1] - theta_new)
         return np.array(res) # inequality operator functions on entire np arrays
@@ -127,6 +128,7 @@ class ModelPredictiveController:
         inp = minimize(fun=lambda x: self._cost(state, x), x0=initial_guess, bounds=bounds, constraints=constraints, method="SLSQP", options={"maxiter": 200})
         if inp.success:
             inp_optimal = inp.x.reshape(self.window, 2)
+            self.last_result = inp_optimal[0]
             return inp_optimal[0]
         else:
-            return [-2, 0]
+            return self.last_result
